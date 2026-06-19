@@ -35,13 +35,13 @@
       </button>
       <button 
         class="action-btn" 
-        :class="{ disabled: isNight || gameOver }"
+        :class="{ disabled: isNight || gameOver || !canHunt }"
         @click="$emit('hunt')"
       >
         <span class="btn-icon">🏹</span>
         <span class="btn-text">狩猎</span>
         <span class="btn-cost">-8 体温</span>
-        <span class="btn-hint">成功率: {{ Math.round(huntRate * 100) }}%</span>
+        <span class="btn-hint">{{ canHunt ? '成功率: ' + Math.round(huntRate * 100) + '%' : '需先制作工具' }}</span>
       </button>
       <button 
         class="action-btn" 
@@ -80,9 +80,11 @@
         @click="$emit('dig')"
       >
         <span class="btn-icon">⛏️</span>
-        <span class="btn-text">打冰洞</span>
+        <span class="btn-text">① 打冰洞</span>
         <span class="btn-cost">-10 体温</span>
-        <span class="btn-hint">需要: 1🔪 + 1🪵</span>
+        <span class="btn-hint">
+          {{ iceHoleDug ? '✓ 已完成' : (canDigHole ? '准备就绪' : '需要: 1🔪 + 1🪵') }}
+        </span>
       </button>
       <button 
         class="action-btn net-btn" 
@@ -90,9 +92,11 @@
         @click="$emit('deploy')"
       >
         <span class="btn-icon">🕸️</span>
-        <span class="btn-text">布渔网</span>
+        <span class="btn-text">② 布渔网</span>
         <span class="btn-cost">-8 体温</span>
-        <span class="btn-hint">需要: 2🪵 + 1🦊</span>
+        <span class="btn-hint">
+          {{ netDeployed ? '✓ 已完成' : (!iceHoleDug ? '先打冰洞' : (canDeploy ? '准备就绪' : '需: 2🪵 + 1🦊')) }}
+        </span>
       </button>
       <button 
         class="action-btn harvest-btn" 
@@ -100,9 +104,11 @@
         @click="$emit('harvest')"
       >
         <span class="btn-icon">🐟</span>
-        <span class="btn-text">收网</span>
+        <span class="btn-text">③ 收网</span>
         <span class="btn-cost">-6 体温</span>
-        <span class="btn-hint">{{ canHarvest ? '可收获食物！' : '需等待一夜' }}</span>
+        <span class="btn-hint">
+          {{ !netDeployed ? '先布渔网' : (canHarvest ? '可收获食物！' : '等待第 ' + (netDeployDay + 1) + ' 天') }}
+        </span>
       </button>
     </div>
   </div>
@@ -114,10 +120,12 @@ defineProps({
   gameOver: { type: Boolean, default: false },
   canFire: { type: Boolean, default: false },
   canCraft: { type: Boolean, default: false },
+  canHunt: { type: Boolean, default: false },
   huntRate: { type: Number, default: 0.3 },
   food: { type: Number, default: 0 },
   iceHoleDug: { type: Boolean, default: false },
   netDeployed: { type: Boolean, default: false },
+  netDeployDay: { type: Number, default: 0 },
   netDeployedDays: { type: Number, default: 0 },
   canDigHole: { type: Boolean, default: false },
   canDeploy: { type: Boolean, default: false },

@@ -63,10 +63,12 @@
             :gameOver="gameOver"
             :canFire="canMakeFire"
             :canCraft="wood >= 2 && hide >= 1"
+            :canHunt="canHunt"
             :huntRate="huntSuccessRate"
             :food="food"
             :iceHoleDug="iceHoleDug"
             :netDeployed="netDeployed"
+            :netDeployDay="netDeployDay"
             :netDeployedDays="netDeployedDays"
             :canDigHole="canDigIceHole"
             :canDeploy="canDeployNet"
@@ -135,6 +137,7 @@ const {
   actionLog,
   isDanger,
   canMakeFire,
+  canHunt,
   huntSuccessRate,
   canDigIceHole,
   canDeployNet,
@@ -193,11 +196,19 @@ function getHeatGradient() {
 }
 
 function handleChop() {
+  if (gameOver.value || isNight.value) {
+    playWarning()
+    return
+  }
   playChop()
   chopWood()
 }
 
 function handleHunt() {
+  if (!canHunt.value || gameOver.value || isNight.value) {
+    playWarning()
+    return
+  }
   playHunt()
   const oldFood = food.value
   hunt()
@@ -207,7 +218,8 @@ function handleHunt() {
 }
 
 function handleCraft() {
-  if (wood.value >= 2 && hide.value >= 1) {
+  const canCraftNow = wood.value >= 2 && hide.value >= 1 && !gameOver.value && !isNight.value
+  if (canCraftNow) {
     playCraft()
     makeTools()
     playSuccess()
@@ -217,60 +229,60 @@ function handleCraft() {
 }
 
 function handleFire() {
-  if (canMakeFire.value) {
-    playFire()
-    makeFire()
-    playSuccess()
-  } else {
+  if (!canMakeFire.value || gameOver.value) {
     playWarning()
+    return
   }
+  playFire()
+  makeFire()
+  playSuccess()
 }
 
 function handleEat() {
-  if (food.value > 0) {
-    playEat()
-    eatFood()
-  } else {
+  if (food.value <= 0 || gameOver.value) {
     playWarning()
+    return
   }
+  playEat()
+  eatFood()
 }
 
 function handleDig() {
-  if (canDigIceHole.value) {
-    playDigIce()
-    const oldHole = iceHoleDug.value
-    digIceHole()
-    if (iceHoleDug.value && !oldHole) {
-      playSuccess()
-    }
-  } else {
+  if (!canDigIceHole.value || gameOver.value || isNight.value) {
     playWarning()
+    return
+  }
+  playDigIce()
+  const oldHole = iceHoleDug.value
+  digIceHole()
+  if (iceHoleDug.value && !oldHole) {
+    playSuccess()
   }
 }
 
 function handleDeploy() {
-  if (canDeployNet.value) {
-    playDeployNet()
-    const oldDeployed = netDeployed.value
-    deployFishingNet()
-    if (netDeployed.value && !oldDeployed) {
-      playSuccess()
-    }
-  } else {
+  if (!canDeployNet.value || gameOver.value || isNight.value) {
     playWarning()
+    return
+  }
+  playDeployNet()
+  const oldDeployed = netDeployed.value
+  deployFishingNet()
+  if (netDeployed.value && !oldDeployed) {
+    playSuccess()
   }
 }
 
 function handleHarvest() {
-  if (canHarvestNet.value) {
-    playHarvest()
-    const oldFood = food.value
-    harvestFishingNet()
-    if (food.value > oldFood) {
-      playSuccess()
-    }
-  } else {
+  if (!canHarvestNet.value || gameOver.value || isNight.value) {
     playWarning()
+    return
+  }
+  playHarvest()
+  const oldFood = food.value
+  harvestFishingNet()
+  if (food.value > oldFood) {
+    playSuccess()
   }
 }
 

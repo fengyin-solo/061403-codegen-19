@@ -151,6 +151,10 @@ export function useGame() {
 
   function hunt() {
     if (gameOver.value || isNight.value) return
+    if (!canHunt.value) {
+      addLog('需要至少 1 件工具才能进行狩猎！', 'warning')
+      return
+    }
     
     const multiplier = isBlizzard.value ? 2 : 1
     const tempCost = 8 * multiplier
@@ -195,14 +199,21 @@ export function useGame() {
 
   function digIceHole() {
     if (gameOver.value || isNight.value) return
+    if (gameOver.value) return
+    if (iceHoleDug.value) {
+      addLog('冰洞已经打好了，无需重复开凿！', 'warning')
+      return
+    }
+    if (tools.value < 1) {
+      addLog('⛏️ 缺少工具：需要先制作至少 1 件工具才能开凿冰洞', 'warning')
+      return
+    }
+    if (wood.value < 1) {
+      addLog('🪵 材料不足：打冰洞需要 1 木头加固洞口边缘', 'warning')
+      return
+    }
     if (!canDigIceHole.value) {
-      if (iceHoleDug.value) {
-        addLog('冰洞已经打好了！', 'warning')
-      } else if (tools.value < 1) {
-        addLog('需要至少 1 个工具才能打冰洞', 'warning')
-      } else {
-        addLog('需要 1 木头来加固冰洞边缘', 'warning')
-      }
+      addLog('当前条件不满足打冰洞要求', 'warning')
       return
     }
 
@@ -213,7 +224,8 @@ export function useGame() {
     iceHoleDug.value = true
     temperature.value = Math.max(0, temperature.value - tempCost)
 
-    addLog(`打冰洞：成功在冰面上凿开洞口，消耗 ${tempCost} 体温和 1 木头`, 'success')
+    addLog(`⛏️ 打冰洞成功：在冰面上凿开了捕鱼洞口`, 'success')
+    addLog(`  消耗：${tempCost} 体温 + 1 木头`, 'action')
 
     if (Math.random() < BLIZZARD_CHANCE * 0.3) {
       triggerBlizzard()
@@ -224,14 +236,24 @@ export function useGame() {
 
   function deployFishingNet() {
     if (gameOver.value || isNight.value) return
+    if (!iceHoleDug.value) {
+      addLog('🕸️ 流程错误：请先完成「打冰洞」才能布网捕鱼', 'warning')
+      return
+    }
+    if (netDeployed.value) {
+      addLog('🕸️ 渔网已经布下，等待明天收网即可', 'warning')
+      return
+    }
+    if (wood.value < 2) {
+      addLog('🪵 材料不足：制作并布下渔网需要 2 木头', 'warning')
+      return
+    }
+    if (hide.value < 1) {
+      addLog('🦊 材料不足：制作并布下渔网需要 1 兽皮', 'warning')
+      return
+    }
     if (!canDeployNet.value) {
-      if (!iceHoleDug.value) {
-        addLog('需要先打冰洞才能布网！', 'warning')
-      } else if (netDeployed.value) {
-        addLog('渔网已经布下了！', 'warning')
-      } else {
-        addLog('材料不足：需要 2 木头和 1 兽皮制作渔网', 'warning')
-      }
+      addLog('当前条件不满足布网要求', 'warning')
       return
     }
 
@@ -244,8 +266,9 @@ export function useGame() {
     netDeployDay.value = dayCount.value
     temperature.value = Math.max(0, temperature.value - tempCost)
 
-    addLog(`布网：成功将渔网放入冰洞，消耗 ${tempCost} 体温、2 木头和 1 兽皮`, 'success')
-    addLog('提示：需要等到明天才能收网，等待越久收获可能越多', 'info')
+    addLog(`🕸️ 布网成功：渔网已沉入冰洞水中`, 'success')
+    addLog(`  消耗：${tempCost} 体温 + 2 木头 + 1 兽皮`, 'action')
+    addLog(`  提示：需等到第 ${dayCount.value + 1} 天才能收网，多等一天产量 +1`, 'info')
 
     if (Math.random() < BLIZZARD_CHANCE * 0.3) {
       triggerBlizzard()
@@ -256,12 +279,16 @@ export function useGame() {
 
   function harvestFishingNet() {
     if (gameOver.value || isNight.value) return
+    if (!netDeployed.value) {
+      addLog('🐟 流程错误：冰洞中还没有渔网，请先完成「布网」', 'warning')
+      return
+    }
+    if (dayCount.value <= netDeployDay.value) {
+      addLog(`🐟 时间不够：渔网必须浸泡一夜才能收网，请第 ${netDeployDay.value + 1} 天再来`, 'warning')
+      return
+    }
     if (!canHarvestNet.value) {
-      if (!netDeployed.value) {
-        addLog('还没有布网！', 'warning')
-      } else {
-        addLog('渔网还需要浸泡一夜才能收网，明天再来吧！', 'warning')
-      }
+      addLog('当前条件不满足收网要求', 'warning')
       return
     }
 
@@ -277,12 +304,17 @@ export function useGame() {
     netDeployed.value = false
     netDeployDay.value = 0
 
+    let yieldBreakdown = []
+    if (tools.value > 0) yieldBreakdown.push(`工具 x${tools.value}: +${(tools.value * 0.1 * 100).toFixed(0)}%`)
+    if (temperature.value >= 50 && temperature.value <= 80) yieldBreakdown.push('适宜气温: +30%')
+    else if (temperature.value >= 30) yieldBreakdown.push('一般气温: +10%')
+    else if (temperature.value < 20) yieldBreakdown.push('严寒低温: -30%')
+    if (isBlizzard.value) yieldBreakdown.push(`暴风雪 Lv.${blizzardStage.value}: -${((0.2 * (1 + blizzardStage.value * 0.1)) * 100).toFixed(0)}%`)
+
     const blizzardInfo = isBlizzard.value ? `（暴风雪阶段 ${blizzardStage.value}）` : ''
-    addLog(
-      `收网：获得 ${finalYield} 食物${blizzardInfo}，消耗 ${tempCost} 体温\n` +
-      `  基础产量: ${baseYield}, 收益加成: x${fishingYieldBonus.value.toFixed(2)}`,
-      'success'
-    )
+    addLog(`🐟 收网成功${blizzardInfo}：获得 ${finalYield} 食物`, 'success')
+    addLog(`  消耗：${tempCost} 体温 | 等待 ${daysWaited} 天 | 基础产量 ${baseYield}`, 'action')
+    addLog(`  加成明细: x${fishingYieldBonus.value.toFixed(2)} (${yieldBreakdown.join('、') || '无特殊加成'})`, 'info')
 
     if (Math.random() < BLIZZARD_CHANCE * 0.2) {
       triggerBlizzard()
