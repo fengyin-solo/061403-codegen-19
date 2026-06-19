@@ -96,6 +96,30 @@ export function useAudio() {
     }
   }
 
+  function playDigIce() {
+    initAudio()
+    playTone(80, 0.12, 'square', 0.2)
+    setTimeout(() => playTone(90, 0.12, 'square', 0.18), 100)
+    setTimeout(() => playTone(70, 0.15, 'square', 0.2), 200)
+    setTimeout(() => playTone(110, 0.1, 'square', 0.15), 320)
+  }
+
+  function playDeployNet() {
+    initAudio()
+    playTone(250, 0.1, 'sine', 0.2)
+    setTimeout(() => playTone(200, 0.1, 'sine', 0.18), 80)
+    setTimeout(() => playTone(150, 0.15, 'sine', 0.15), 160)
+  }
+
+  function playHarvest() {
+    initAudio()
+    playTone(300, 0.1, 'sine', 0.2)
+    setTimeout(() => playTone(400, 0.1, 'sine', 0.2), 80)
+    setTimeout(() => playTone(500, 0.1, 'sine', 0.2), 160)
+    setTimeout(() => playTone(600, 0.15, 'sine', 0.25), 240)
+    setTimeout(() => playTone(800, 0.2, 'sine', 0.3), 360)
+  }
+
   function toggleMute() {
     muted.value = !muted.value
   }
@@ -112,6 +136,9 @@ export function useAudio() {
     playEat,
     playCraft,
     playBlizzard,
+    playDigIce,
+    playDeployNet,
+    playHarvest,
     toggleMute
   }
 }

@@ -65,11 +65,21 @@
             :canCraft="wood >= 2 && hide >= 1"
             :huntRate="huntSuccessRate"
             :food="food"
+            :iceHoleDug="iceHoleDug"
+            :netDeployed="netDeployed"
+            :netDeployedDays="netDeployedDays"
+            :canDigHole="canDigIceHole"
+            :canDeploy="canDeployNet"
+            :canHarvest="canHarvestNet"
+            :fishingBonus="fishingYieldBonus"
             @chop="handleChop"
             @hunt="handleHunt"
             @craft="handleCraft"
             @fire="handleFire"
             @eat="handleEat"
+            @dig="handleDig"
+            @deploy="handleDeploy"
+            @harvest="handleHarvest"
           />
         </div>
       </div>
@@ -116,17 +126,28 @@ const {
   isNight,
   dayCount,
   isBlizzard,
+  blizzardStage,
+  iceHoleDug,
+  netDeployed,
+  netDeployDay,
   gameOver,
   gameOverReason,
   actionLog,
   isDanger,
   canMakeFire,
   huntSuccessRate,
+  canDigIceHole,
+  canDeployNet,
+  canHarvestNet,
+  fishingYieldBonus,
   chopWood,
   hunt,
   makeTools,
   makeFire,
   eatFood,
+  digIceHole,
+  deployFishingNet,
+  harvestFishingNet,
   saveGame,
   loadGame,
   getSaveSlots,
@@ -145,10 +166,18 @@ const {
   playEat,
   playCraft,
   playBlizzard,
+  playDigIce,
+  playDeployNet,
+  playHarvest,
   toggleMute
 } = useAudio()
 
 const saveSlots = computed(() => getSaveSlots())
+
+const netDeployedDays = computed(() => {
+  if (!netDeployed.value || netDeployDay.value === 0) return 0
+  return dayCount.value - netDeployDay.value
+})
 
 const gameBgClass = computed(() => ({
   'day-bg': isDay.value && !isBlizzard.value,
@@ -201,6 +230,45 @@ function handleEat() {
   if (food.value > 0) {
     playEat()
     eatFood()
+  } else {
+    playWarning()
+  }
+}
+
+function handleDig() {
+  if (canDigIceHole.value) {
+    playDigIce()
+    const oldHole = iceHoleDug.value
+    digIceHole()
+    if (iceHoleDug.value && !oldHole) {
+      playSuccess()
+    }
+  } else {
+    playWarning()
+  }
+}
+
+function handleDeploy() {
+  if (canDeployNet.value) {
+    playDeployNet()
+    const oldDeployed = netDeployed.value
+    deployFishingNet()
+    if (netDeployed.value && !oldDeployed) {
+      playSuccess()
+    }
+  } else {
+    playWarning()
+  }
+}
+
+function handleHarvest() {
+  if (canHarvestNet.value) {
+    playHarvest()
+    const oldFood = food.value
+    harvestFishingNet()
+    if (food.value > oldFood) {
+      playSuccess()
+    }
   } else {
     playWarning()
   }

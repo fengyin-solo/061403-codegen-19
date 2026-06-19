@@ -10,9 +10,14 @@ export function useGame() {
   const isDay = ref(true)
   const dayCount = ref(1)
   const isBlizzard = ref(false)
+  const blizzardStage = ref(0)
   const gameOver = ref(false)
   const gameOverReason = ref('')
   const actionLog = ref([])
+
+  const iceHoleDug = ref(false)
+  const netDeployed = ref(false)
+  const netDeployDay = ref(0)
 
   const DAY_DURATION = 30000
   const NIGHT_DURATION = 20000
@@ -28,6 +33,25 @@ export function useGame() {
   const canMakeFire = computed(() => wood.value >= 3)
   const canHunt = computed(() => tools.value > 0)
   const huntSuccessRate = computed(() => 0.3 + tools.value * 0.15)
+
+  const canDigIceHole = computed(() => !iceHoleDug.value && tools.value >= 1 && wood.value >= 1)
+  const canDeployNet = computed(() => iceHoleDug.value && !netDeployed.value && wood.value >= 2 && hide.value >= 1)
+  const canHarvestNet = computed(() => netDeployed.value && dayCount.value > netDeployDay.value)
+  const fishingYieldBonus = computed(() => {
+    let bonus = 1
+    bonus += tools.value * 0.1
+    if (temperature.value >= 50 && temperature.value <= 80) {
+      bonus += 0.3
+    } else if (temperature.value >= 30) {
+      bonus += 0.1
+    } else if (temperature.value < 20) {
+      bonus -= 0.3
+    }
+    if (isBlizzard.value) {
+      bonus -= 0.2 * (1 + blizzardStage.value * 0.1)
+    }
+    return Math.max(0.2, bonus)
+  })
 
   function addLog(message, type = 'info') {
     const timestamp = new Date().toLocaleTimeString()
@@ -84,6 +108,7 @@ export function useGame() {
     dayCount.value++
     addLog(`天亮了，第 ${dayCount.value} 天开始`, 'success')
     isBlizzard.value = false
+    blizzardStage.value = 0
     if (nightConsumptionTimer) {
       clearInterval(nightConsumptionTimer)
       nightConsumptionTimer = null
@@ -101,7 +126,8 @@ export function useGame() {
 
   function triggerBlizzard() {
     isBlizzard.value = true
-    addLog('⚠️ 暴风雪来袭！所有消耗加倍！', 'danger')
+    blizzardStage.value = Math.min(blizzardStage.value + 1, 5)
+    addLog(`⚠️ 暴风雪来袭（阶段 ${blizzardStage.value}）！所有消耗加倍！`, 'danger')
   }
 
   function chopWood() {
@@ -164,6 +190,104 @@ export function useGame() {
     temperature.value = Math.max(0, temperature.value - tempCost)
     
     addLog(`制作工具：获得 1 工具，消耗 ${tempCost} 体温`, 'success')
+    checkGameOver()
+  }
+
+  function digIceHole() {
+    if (gameOver.value || isNight.value) return
+    if (!canDigIceHole.value) {
+      if (iceHoleDug.value) {
+        addLog('冰洞已经打好了！', 'warning')
+      } else if (tools.value < 1) {
+        addLog('需要至少 1 个工具才能打冰洞', 'warning')
+      } else {
+        addLog('需要 1 木头来加固冰洞边缘', 'warning')
+      }
+      return
+    }
+
+    const multiplier = isBlizzard.value ? 2 : 1
+    const tempCost = 10 * multiplier
+
+    wood.value -= 1
+    iceHoleDug.value = true
+    temperature.value = Math.max(0, temperature.value - tempCost)
+
+    addLog(`打冰洞：成功在冰面上凿开洞口，消耗 ${tempCost} 体温和 1 木头`, 'success')
+
+    if (Math.random() < BLIZZARD_CHANCE * 0.3) {
+      triggerBlizzard()
+    }
+
+    checkGameOver()
+  }
+
+  function deployFishingNet() {
+    if (gameOver.value || isNight.value) return
+    if (!canDeployNet.value) {
+      if (!iceHoleDug.value) {
+        addLog('需要先打冰洞才能布网！', 'warning')
+      } else if (netDeployed.value) {
+        addLog('渔网已经布下了！', 'warning')
+      } else {
+        addLog('材料不足：需要 2 木头和 1 兽皮制作渔网', 'warning')
+      }
+      return
+    }
+
+    const multiplier = isBlizzard.value ? 2 : 1
+    const tempCost = 8 * multiplier
+
+    wood.value -= 2
+    hide.value -= 1
+    netDeployed.value = true
+    netDeployDay.value = dayCount.value
+    temperature.value = Math.max(0, temperature.value - tempCost)
+
+    addLog(`布网：成功将渔网放入冰洞，消耗 ${tempCost} 体温、2 木头和 1 兽皮`, 'success')
+    addLog('提示：需要等到明天才能收网，等待越久收获可能越多', 'info')
+
+    if (Math.random() < BLIZZARD_CHANCE * 0.3) {
+      triggerBlizzard()
+    }
+
+    checkGameOver()
+  }
+
+  function harvestFishingNet() {
+    if (gameOver.value || isNight.value) return
+    if (!canHarvestNet.value) {
+      if (!netDeployed.value) {
+        addLog('还没有布网！', 'warning')
+      } else {
+        addLog('渔网还需要浸泡一夜才能收网，明天再来吧！', 'warning')
+      }
+      return
+    }
+
+    const multiplier = isBlizzard.value ? 2 : 1
+    const tempCost = 6 * multiplier
+    temperature.value = Math.max(0, temperature.value - tempCost)
+
+    const daysWaited = dayCount.value - netDeployDay.value
+    const baseYield = 2 + daysWaited
+    const finalYield = Math.max(1, Math.round(baseYield * fishingYieldBonus.value))
+
+    food.value += finalYield
+    netDeployed.value = false
+    netDeployDay.value = 0
+
+    const blizzardInfo = isBlizzard.value ? `（暴风雪阶段 ${blizzardStage.value}）` : ''
+    addLog(
+      `收网：获得 ${finalYield} 食物${blizzardInfo}，消耗 ${tempCost} 体温\n` +
+      `  基础产量: ${baseYield}, 收益加成: x${fishingYieldBonus.value.toFixed(2)}`,
+      'success'
+    )
+
+    if (Math.random() < BLIZZARD_CHANCE * 0.2) {
+      triggerBlizzard()
+    }
+
     checkGameOver()
   }
 
@@ -230,6 +354,10 @@ export function useGame() {
       isDay: isDay.value,
       dayCount: dayCount.value,
       isBlizzard: isBlizzard.value,
+      blizzardStage: blizzardStage.value,
+      iceHoleDug: iceHoleDug.value,
+      netDeployed: netDeployed.value,
+      netDeployDay: netDeployDay.value,
       savedAt: Date.now()
     }
     localStorage.setItem(`snowSurvival_${slot}`, JSON.stringify(gameState))
@@ -254,6 +382,10 @@ export function useGame() {
       isDay.value = gameState.isDay
       dayCount.value = gameState.dayCount
       isBlizzard.value = gameState.isBlizzard
+      blizzardStage.value = gameState.blizzardStage || 0
+      iceHoleDug.value = gameState.iceHoleDug || false
+      netDeployed.value = gameState.netDeployed || false
+      netDeployDay.value = gameState.netDeployDay || 0
       gameOver.value = false
       gameOverReason.value = ''
       actionLog.value = []
@@ -307,6 +439,10 @@ export function useGame() {
     isDay.value = true
     dayCount.value = 1
     isBlizzard.value = false
+    blizzardStage.value = 0
+    iceHoleDug.value = false
+    netDeployed.value = false
+    netDeployDay.value = 0
     gameOver.value = false
     gameOverReason.value = ''
     actionLog.value = []
@@ -337,6 +473,10 @@ export function useGame() {
     isNight,
     dayCount,
     isBlizzard,
+    blizzardStage,
+    iceHoleDug,
+    netDeployed,
+    netDeployDay,
     gameOver,
     gameOverReason,
     actionLog,
@@ -344,11 +484,18 @@ export function useGame() {
     canMakeFire,
     canHunt,
     huntSuccessRate,
+    canDigIceHole,
+    canDeployNet,
+    canHarvestNet,
+    fishingYieldBonus,
     chopWood,
     hunt,
     makeTools,
     makeFire,
     eatFood,
+    digIceHole,
+    deployFishingNet,
+    harvestFishingNet,
     saveGame,
     loadGame,
     getSaveSlots,
